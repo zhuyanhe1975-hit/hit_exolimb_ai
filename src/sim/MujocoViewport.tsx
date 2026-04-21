@@ -20,11 +20,14 @@ interface MujocoViewportProps {
   human: HumanState;
   activeSkill?: SkillCall;
   running: boolean;
+  jointTest: boolean;
+  mode: string;
+  loaded: boolean;
   onRobotState: (state: RuntimeRobotViewState) => void;
 }
 
 export const MujocoViewport = forwardRef<MujocoViewportHandle, MujocoViewportProps>(
-  ({ human, activeSkill, running, onRobotState }, ref) => {
+  ({ human, activeSkill, running, jointTest, mode, loaded, onRobotState }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const runtimeRef = useRef<BrowserMujocoRuntime | null>(null);
 
@@ -42,7 +45,18 @@ export const MujocoViewport = forwardRef<MujocoViewportHandle, MujocoViewportPro
         onState: onRobotState,
       });
       runtimeRef.current = runtime;
-      void runtime.initialize();
+      void runtime.initialize().catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "MuJoCo runtime 初始化失败。";
+        onRobotState({
+          endEffector: [0, 0, 0],
+          target: [0, 0, 0],
+          mode: "error",
+          effort: 0,
+          trackingError: 0,
+          contact: message,
+          loaded: false,
+        });
+      });
 
       return () => {
         runtime.dispose();
@@ -54,10 +68,18 @@ export const MujocoViewport = forwardRef<MujocoViewportHandle, MujocoViewportPro
     }, [running]);
 
     useEffect(() => {
+      runtimeRef.current?.setJointTestMode(jointTest);
+    }, [jointTest]);
+
+    useEffect(() => {
       runtimeRef.current?.setHumanControl(human, activeSkill);
     }, [human, activeSkill]);
 
-    return <canvas ref={canvasRef} className="mujoco-canvas" />;
+    return (
+      <div className="viewport-shell">
+        <canvas ref={canvasRef} className="mujoco-canvas" />
+      </div>
+    );
   },
 );
 

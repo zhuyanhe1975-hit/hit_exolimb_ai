@@ -1,9 +1,9 @@
 :root {
   color-scheme: light;
-  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  background: radial-gradient(circle at top left, #fdf8ea 0%, #f5eee2 36%, #ebe8e0 100%);
+  background: #d7e6f7;
   color: #1f2933;
   --panel-bg: rgba(255, 255, 255, 0.82);
   --panel-border: rgba(93, 108, 126, 0.18);
@@ -25,6 +25,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: linear-gradient(180deg, #dce9f8 0%, #eef4fb 100%);
 }
 
 button,
@@ -37,11 +38,11 @@ textarea {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-columns: 1.1fr 1.45fr 1fr;
-  gap: 1rem;
   min-height: 100vh;
-  padding: 1rem;
+}
+
+.minimal-shell {
+  padding: 0;
 }
 
 .panel {
@@ -197,11 +198,196 @@ h3 {
 
 .mujoco-canvas {
   width: 100%;
-  min-height: 480px;
-  border-radius: 1rem;
-  background: linear-gradient(180deg, #f7efe3 0%, #f0e4d4 100%);
+  min-height: 100vh;
+  height: 100vh;
+  border-radius: 0;
+  background: linear-gradient(180deg, #dbeafe 0%, #eff6ff 100%);
   overflow: hidden;
   display: block;
+}
+
+.viewport-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0;
+  border: 0;
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.92) 0%, rgba(239, 246, 255, 0.96) 100%);
+  min-height: 100vh;
+}
+
+.viewport-chip {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.46rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(191, 219, 254, 0.92);
+  backdrop-filter: blur(10px);
+  color: #1e3a8a;
+  box-shadow: 0 10px 24px rgba(148, 163, 184, 0.14);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.viewport-chip-title {
+  top: 1.1rem;
+  left: 1.15rem;
+}
+
+.viewport-chip-status {
+  top: 1.1rem;
+  right: 1.15rem;
+}
+
+.viewport-chip-hint {
+  left: 1.15rem;
+  bottom: 1.15rem;
+  color: #475569;
+}
+
+.hero-stage {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.hud {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.hud-top {
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.hud-left {
+  left: 1rem;
+  top: 5.8rem;
+  max-width: min(28rem, calc(100vw - 2rem));
+}
+
+.hud-right {
+  right: 1rem;
+  top: 5.8rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.hud-bottom {
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+
+.hud-brand h1 {
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+}
+
+.hud-pills {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.floating-panel {
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 42px rgba(59, 78, 102, 0.14);
+  backdrop-filter: blur(14px);
+}
+
+.task-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem;
+  border-radius: 1.25rem;
+}
+
+.task-tab {
+  border: 0;
+  padding: 0.82rem 1rem;
+  border-radius: 1rem;
+  background: transparent;
+  color: #405164;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.task-tab:hover,
+.task-tab.active {
+  background: rgba(43, 101, 184, 0.12);
+  color: #173b74;
+  transform: translateY(-1px);
+}
+
+.quick-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1.3rem;
+  min-width: min(40rem, calc(100vw - 2rem));
+}
+
+.mini-stat {
+  min-width: 0;
+}
+
+.mini-stat span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6a7b8f;
+  margin-bottom: 0.2rem;
+}
+
+.mini-stat strong {
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: #213246;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.control-dock {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  border-radius: 999px;
+  align-items: center;
+}
+
+.status-note {
+  padding: 0.85rem 1rem;
+  border-radius: 1.15rem;
+  max-width: 100%;
+}
+
+.status-note strong {
+  display: block;
+  color: #203246;
+  line-height: 1.35;
 }
 
 .stat-card,
@@ -247,11 +433,85 @@ h3 {
 }
 
 @media (max-width: 1100px) {
-  .app-shell {
-    grid-template-columns: 1fr;
+  .mujoco-canvas {
+    min-height: 100vh;
   }
 
-  .mujoco-canvas {
-    min-height: 360px;
+  .viewport-chip-status {
+    top: auto;
+    right: 1rem;
+    bottom: 1rem;
+  }
+
+  .hud-top,
+  .hud-bottom {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hud-left,
+  .hud-right {
+    left: 1rem;
+    right: 1rem;
+    max-width: none;
+  }
+
+  .hud-left {
+    top: auto;
+    bottom: 8rem;
+  }
+
+  .hud-right {
+    top: 5.8rem;
+  }
+
+  .task-switcher {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .task-tab {
+    min-width: 12rem;
+  }
+
+  .quick-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .control-dock {
+    justify-content: space-between;
+    border-radius: 1.1rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .hud-top,
+  .hud-left,
+  .hud-right,
+  .hud-bottom {
+    left: 0.75rem;
+    right: 0.75rem;
+  }
+
+  .viewport-chip-title,
+  .viewport-chip-status,
+  .viewport-chip-hint {
+    font-size: 0.7rem;
+  }
+
+  .quick-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+  }
+
+  .control-dock {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 1.15rem;
+  }
+
+  .control {
+    width: 100%;
   }
 }

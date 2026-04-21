@@ -1,0 +1,156 @@
+<mujoco model="hit_exolimb_human_layout">
+    <include file="../common/skybox.xml"/>
+    <include file="../common/visual.xml"/>
+    <include file="../common/materials.xml"/>
+
+    <compiler angle="radian"/>
+    <option timestep="0.001">
+        <flag contact="disable"/>
+    </option>
+
+    <asset>
+        <mesh name="base_link" file="../serial/base_link.STL" />
+        <mesh name="Link1" file="../serial/Link1.STL" />
+        <mesh name="Link2" file="../serial/Link2.STL" />
+        <mesh name="Link3" file="../serial/Link3.STL" />
+        <mesh name="Link4" file="../serial/Link4.STL" />
+        <mesh name="Link5" file="../serial/Link5.STL" />
+        <mesh name="Link6" file="../serial/Link6.STL" />
+        <material name="human_ref" rgba="0.88 0.9 0.93 1"/>
+        <material name="pack_dark" rgba="0.1 0.12 0.16 1"/>
+        <material name="mount_light" rgba="0.84 0.86 0.9 1"/>
+    </asset>
+
+    <default>
+        <geom contype="0" conaffinity="0"/>
+        <joint limited="false" damping="0.4"/>
+        <motor gear="1"/>
+    </default>
+
+    <worldbody>
+        <geom name="floor" pos="0 0 0" size="10 10 0.125" material="grid" type="plane"/>
+
+        <!--
+          Human proxy + exolimb layout scene.
+          Recommended edit points:
+          1. backpack_root pos/euler
+          2. exo_right_root pos/euler
+          3. exo_left_root pos/euler
+          4. shoulder marker sites below
+        -->
+        <body name="human_root" pos="0 0 0">
+            <body name="pelvis" pos="0 0 0.92">
+                <geom name="pelvis_geom" type="capsule" fromto="0 -0.05 0 0 0.05 0" size="0.11" material="human_ref"/>
+            </body>
+
+            <body name="torso" pos="0 0 1.16">
+                <geom name="torso_geom" type="capsule" fromto="0 0 -0.26 0 0 0.22" size="0.16" material="human_ref"/>
+                <site name="right_shoulder_marker" pos="-0.05 -0.2 0.17" size="0.025" rgba="1 0.2 0.2 1"/>
+                <site name="left_shoulder_marker" pos="-0.05 0.2 0.17" size="0.025" rgba="0.2 0.4 1 1"/>
+                <site name="neck_marker" pos="0 0 0.26" size="0.02" rgba="1 1 0.2 1"/>
+            </body>
+
+            <body name="head" pos="0 0 1.62">
+                <geom name="head_geom" type="sphere" size="0.12" material="human_ref"/>
+            </body>
+
+            <body name="right_arm_ref" pos="0.03 -0.26 1.34">
+                <geom type="capsule" fromto="0 0 0 0.26 0 -0.22" size="0.055" material="human_ref"/>
+                <body name="right_forearm_ref" pos="0.26 0 -0.22">
+                    <geom type="capsule" fromto="0 0 0 0.22 0 -0.18" size="0.045" material="human_ref"/>
+                </body>
+            </body>
+
+            <body name="left_arm_ref" pos="0.03 0.26 1.34">
+                <geom type="capsule" fromto="0 0 0 0.26 0 -0.22" size="0.055" material="human_ref"/>
+                <body name="left_forearm_ref" pos="0.26 0 -0.22">
+                    <geom type="capsule" fromto="0 0 0 0.22 0 -0.18" size="0.045" material="human_ref"/>
+                </body>
+            </body>
+
+            <body name="backpack_root" pos="-0.32 0 1.03" euler="0 0 0">
+                <geom name="backpack_geom" type="box" size="0.08 0.15 0.25" material="pack_dark"/>
+                <geom name="shoulder_bar_geom" type="box" pos="0.06 0 0.28" size="0.05 0.21 0.03" material="pack_dark"/>
+                <geom name="right_mount_geom" type="cylinder" pos="0.1 -0.19 0.31" euler="1.57079632679 0 0" size="0.095 0.055" material="mount_light"/>
+                <geom name="left_mount_geom" type="cylinder" pos="0.1 0.19 0.31" euler="1.57079632679 0 0" size="0.095 0.055" material="mount_light"/>
+                <site name="exo_right_mount_site" pos="0.1 -0.19 0.31" size="0.02" rgba="1 0 0 1"/>
+                <site name="exo_left_mount_site" pos="0.1 0.19 0.31" size="0.02" rgba="0 0.6 1 1"/>
+
+                <!-- Right arm: keep first axis vertical. Adjust root pos/euler here. -->
+                <body name="exo_right_root" pos="0.1 -0.19 0.31" euler="0 0 2.2">
+                    <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="base_link" />
+                    <body name="right_Link1" pos="0 0 0">
+                        <joint name="right_joint1" pos="0 0 0" axis="0 0 1" />
+                        <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link1" />
+                        <body name="right_Link2" pos="0.083 0 0.09315">
+                            <joint name="right_joint2" pos="0 0 0" axis="0 -1 0" />
+                            <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link2" />
+                            <body name="right_Link3" pos="0.39094 0 -0.029583">
+                                <joint name="right_joint3" pos="0 0 0" axis="0 -1 0" />
+                                <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link3" />
+                                <body name="right_Link4" pos="0.33481 0 0.029583">
+                                    <joint name="right_joint4" pos="0 0 0" axis="0 0 -1" />
+                                    <geom type="mesh" rgba="0.69 0.69 0.69 1" mesh="Link4" />
+                                    <body name="right_Link5" pos="0.024 0 0">
+                                        <joint name="right_joint5" pos="0 0 0" axis="0 -1 0" />
+                                        <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link5" />
+                                        <body name="right_Link6" pos="0.067104 0 0">
+                                            <joint name="right_joint6" pos="0 0 0" axis="-1 0 0" />
+                                            <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link6" />
+                                            <site name="right_tool_site" pos="0 0 0.02" size="0.02" rgba="1 0.5 0 1"/>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+
+                <!-- Left arm: keep first axis vertical. Adjust root pos/euler here. -->
+                <body name="exo_left_root" pos="0.1 0.19 0.31" euler="0 0 2.2">
+                    <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="base_link" />
+                    <body name="left_Link1" pos="0 0 0">
+                        <joint name="left_joint1" pos="0 0 0" axis="0 0 1" />
+                        <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link1" />
+                        <body name="left_Link2" pos="0.083 0 0.09315">
+                            <joint name="left_joint2" pos="0 0 0" axis="0 -1 0" />
+                            <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link2" />
+                            <body name="left_Link3" pos="0.39094 0 -0.029583">
+                                <joint name="left_joint3" pos="0 0 0" axis="0 -1 0" />
+                                <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link3" />
+                                <body name="left_Link4" pos="0.33481 0 0.029583">
+                                    <joint name="left_joint4" pos="0 0 0" axis="0 0 -1" />
+                                    <geom type="mesh" rgba="0.69 0.69 0.69 1" mesh="Link4" />
+                                    <body name="left_Link5" pos="0.024 0 0">
+                                        <joint name="left_joint5" pos="0 0 0" axis="0 -1 0" />
+                                        <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link5" />
+                                        <body name="left_Link6" pos="0.067104 0 0">
+                                            <joint name="left_joint6" pos="0 0 0" axis="-1 0 0" />
+                                            <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="Link6" />
+                                            <site name="left_tool_site" pos="0 0 0.02" size="0.02" rgba="0 0.6 1 1"/>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+
+    <actuator>
+        <motor name="right_motor_1" joint="right_joint1"/>
+        <motor name="right_motor_2" joint="right_joint2"/>
+        <motor name="right_motor_3" joint="right_joint3"/>
+        <motor name="right_motor_4" joint="right_joint4"/>
+        <motor name="right_motor_5" joint="right_joint5"/>
+        <motor name="right_motor_6" joint="right_joint6"/>
+        <motor name="left_motor_1" joint="left_joint1"/>
+        <motor name="left_motor_2" joint="left_joint2"/>
+        <motor name="left_motor_3" joint="left_joint3"/>
+        <motor name="left_motor_4" joint="left_joint4"/>
+        <motor name="left_motor_5" joint="left_joint5"/>
+        <motor name="left_motor_6" joint="left_joint6"/>
+    </actuator>
+</mujoco>

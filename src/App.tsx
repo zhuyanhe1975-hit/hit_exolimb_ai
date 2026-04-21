@@ -65,6 +65,7 @@ export default function App() {
   const [execution, setExecution] = useState<PlanExecutionState>(createIdleExecutionState());
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(createBootSnapshot());
   const [running, setRunning] = useState(false);
+  const [jointTest, setJointTest] = useState(false);
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [spatialResult, setSpatialResult] = useState<GeminiSpatialResult | null>(null);
@@ -87,6 +88,17 @@ export default function App() {
   }, [selectedTaskId, taskText]);
 
   const activeClip = useMemo(() => getClipForTask(selectedTask.taskType), [selectedTask.taskType]);
+  const activeSkillLabel =
+    jointTest
+      ? "六轴测试"
+      : execution.activeSkill?.skillName ?? currentPlan.skills[execution.activeSkillIndex]?.skillName ?? "待机";
+  const runtimeLabel = robotRuntime.loaded
+    ? "MuJoCo Live"
+    : robotRuntime.mode === "fallback"
+      ? "Fallback"
+      : "Loading";
+  const compactTaskLabel =
+    defaultTasks.find((task) => task.id === selectedTaskId)?.userText ?? selectedTask.userText;
 
   useEffect(() => {
     const plan = buildExecutionPlan(selectedTask);
@@ -211,6 +223,11 @@ export default function App() {
     setSpatialResult(null);
     setAnalysisError(null);
     setRunning(false);
+    setJointTest(false);
+  };
+
+  const handleToggleJointTest = (): void => {
+    setJointTest((previous) => !previous);
   };
 
   const handleAnalyzeScene = async (): Promise<void> => {
@@ -235,185 +252,97 @@ export default function App() {
   };
 
   return (
-    <main className="app-shell">
-      <section className="panel panel-input">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Task UI</p>
-            <h1>HIT ExoLimb AI Prototype</h1>
-          </div>
-          <span className="badge">MuJoCo WASM + Gemini</span>
-        </div>
-        <p className="intro">
-          使用真实 `hitexo.xml` 外肢体模型在浏览器内进行 MuJoCo WASM 仿真，人体动作负责驱动末端目标，
-          同时支持加载 AI4AnimationPy 导出的 GLB 人体资产做同屏显示。
-        </p>
-
-        <label className="label" htmlFor="task">
-          任务描述
-        </label>
-        <textarea
-          id="task"
-          className="task-input"
-          value={taskText}
-          onChange={(event) => setTaskText(event.target.value)}
-          rows={4}
-        />
-
-        <div className="task-grid">
-          {defaultTasks.map((task) => (
-            <button
-              key={task.id}
-              className={`task-chip ${task.id === selectedTaskId ? "active" : ""}`}
-              onClick={() => handleTaskSelection(task)}
-              type="button"
-            >
-              <strong>{task.userText}</strong>
-              <span>{task.taskType}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="control-row">
-          <button className="control primary" onClick={handleStart} type="button">
-            启动
-          </button>
-          <button className="control" onClick={handlePause} type="button">
-            暂停
-          </button>
-          <button className="control" onClick={handleReset} type="button">
-            重置
-          </button>
-        </div>
-
-        <div className="control-row">
-          <button className="control accent" onClick={() => void handleAnalyzeScene()} type="button">
-            {analysisBusy ? "分析中..." : "Gemini 场景分析"}
-          </button>
-        </div>
-
-        <div className="task-summary">
-          <div>
-            <span className="summary-label">Planner</span>
-            <strong>{currentPlan.summary}</strong>
-          </div>
-          <div>
-            <span className="summary-label">Confidence</span>
-            <strong>{Math.round(currentPlan.confidence * 100)}%</strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel panel-sim">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Simulation Core</p>
-            <h2>{snapshot.scene.name}</h2>
-          </div>
-          <span className={`status-pill ${running ? "live" : ""}`}>
-            {running ? "Running" : "Paused"}
-          </span>
-        </div>
-
+    <main className="app-shell minimal-shell">
+      <section className="hero-stage">
         <MujocoViewport
           ref={viewportRef}
           human={snapshot.human}
           activeSkill={execution.activeSkill}
           running={running}
+          jointTest={jointTest}
+          mode={robotRuntime.mode}
+          loaded={robotRuntime.loaded}
           onRobotState={handleRobotState}
         />
 
-        <div className="sim-stats">
-          <div className="stat-card">
-            <span>Human Phase</span>
-            <strong>{prettyPhase(snapshot.human.phase)}</strong>
+        <div className="hud hud-top">
+          <div className="hud-brand">
+            <span className="eyebrow">HIT ExoLimb AI</span>
+            <h1>ExoLimb Viewer</h1>
           </div>
-          <div className="stat-card">
-            <span>Robot Mode</span>
-            <strong>{robotRuntime.mode}</strong>
-          </div>
-          <div className="stat-card">
-            <span>MuJoCo</span>
-            <strong>{robotRuntime.loaded ? "Real Model Loaded" : "Loading..."}</strong>
-          </div>
-          <div className="stat-card">
-            <span>Sim Time</span>
-            <strong>{snapshot.simTime.toFixed(2)} s</strong>
+          <div className="hud-pills">
+            <span className={`status-pill ${running ? "live" : ""}`}>{running ? "运行中" : "已暂停"}</span>
+            <span className={`status-pill ${jointTest ? "live" : ""}`}>{jointTest ? "关节测试" : "任务模式"}</span>
+            <span className="status-pill">{runtimeLabel}</span>
           </div>
         </div>
-      </section>
 
-      <section className="panel panel-state">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Execution View</p>
-            <h2>技能计划与状态</h2>
-          </div>
-          <span className="badge subtle">{execution.status}</span>
-        </div>
-
-        <div className="state-block">
-          <h3>人体状态</h3>
-          <p>{snapshot.human.clipName}</p>
-          <ul className="detail-list">
-            <li>阶段：{prettyPhase(snapshot.human.phase)}</li>
-            <li>目标区：{snapshot.human.targetZoneId}</li>
-            <li>
-              手部轨迹：({snapshot.human.hand[0].toFixed(1)}, {snapshot.human.hand[1].toFixed(1)})
-            </li>
-          </ul>
-        </div>
-
-        <div className="state-block">
-          <h3>计划执行</h3>
-          <p>{execution.reason}</p>
-          <ul className="plan-list">
-            {currentPlan.skills.map((skill, index) => (
-              <li
-                key={`${skill.skillName}-${index}`}
-                className={index === execution.activeSkillIndex ? "active" : ""}
+        <div className="hud hud-left">
+          <div className="floating-panel task-switcher">
+            {defaultTasks.map((task) => (
+              <button
+                key={task.id}
+                className={`task-tab ${task.id === selectedTaskId ? "active" : ""}`}
+                onClick={() => handleTaskSelection(task)}
+                type="button"
               >
-                <strong>{skill.skillName}</strong>
-                <span>{skill.description}</span>
-              </li>
+                {task.userText}
+              </button>
             ))}
-          </ul>
+          </div>
         </div>
 
-        <div className="state-block">
-          <h3>MuJoCo 外肢体</h3>
-          <ul className="detail-list">
-            <li>
-              末端位置：({robotRuntime.endEffector[0].toFixed(3)}, {robotRuntime.endEffector[1].toFixed(3)},{" "}
-              {robotRuntime.endEffector[2].toFixed(3)})
-            </li>
-            <li>
-              mocap 目标：({robotRuntime.target[0].toFixed(3)}, {robotRuntime.target[1].toFixed(3)},{" "}
-              {robotRuntime.target[2].toFixed(3)})
-            </li>
-            <li>跟踪误差：{robotRuntime.trackingError.toFixed(4)}</li>
-            <li>{robotRuntime.contact}</li>
-          </ul>
+        <div className="hud hud-bottom">
+          <div className="floating-panel quick-stats">
+            <div className="mini-stat">
+              <span>任务</span>
+              <strong>{compactTaskLabel}</strong>
+            </div>
+            <div className="mini-stat">
+              <span>阶段</span>
+              <strong>{prettyPhase(snapshot.human.phase)}</strong>
+            </div>
+            <div className="mini-stat">
+              <span>技能</span>
+              <strong>{activeSkillLabel}</strong>
+            </div>
+            <div className="mini-stat">
+              <span>时间</span>
+              <strong>{snapshot.simTime.toFixed(1)}s</strong>
+            </div>
+          </div>
+
+          <div className="floating-panel control-dock">
+            <button className="control primary" onClick={handleStart} type="button">
+              启动
+            </button>
+            <button className="control" onClick={handlePause} type="button">
+              暂停
+            </button>
+            <button className="control" onClick={handleReset} type="button">
+              重置
+            </button>
+            <button className={`control ${jointTest ? "primary" : ""}`} onClick={handleToggleJointTest} type="button">
+              {jointTest ? "停止测试" : "关节测试"}
+            </button>
+            <button className="control accent" onClick={() => void handleAnalyzeScene()} type="button">
+              {analysisBusy ? "分析中" : "分析"}
+            </button>
+          </div>
         </div>
 
-        <div className="state-block">
-          <h3>Gemini Spatial Understanding</h3>
-          {analysisError ? <p className="error-text">{analysisError}</p> : null}
-          {spatialResult ? (
-            <>
-              <p>已从当前 MuJoCo 视角返回 {spatialResult.points.length} 个结构化目标点。</p>
-              <ul className="detail-list">
-                {spatialResult.points.slice(0, 6).map((item, index) => (
-                  <li key={`${item.label}-${index}`}>
-                    {item.label}: [{item.point[0]}, {item.point[1]}]
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p>点击“Gemini 场景分析”后，会把当前仿真截图发送给 Gemini Robotics-ER。</p>
-          )}
-        </div>
+        {(analysisError ?? spatialResult) ? (
+          <div className="hud hud-right">
+            <div className="floating-panel status-note">
+              <span className="summary-label">Gemini</span>
+              <strong>
+                {analysisError
+                  ? analysisError
+                  : `识别到 ${spatialResult?.points.length ?? 0} 个目标点`}
+              </strong>
+            </div>
+          </div>
+        ) : null}
       </section>
     </main>
   );

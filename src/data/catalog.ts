@@ -58,12 +58,12 @@ export const humanModel: HumanModelSpec = {
 };
 
 export const humanVisualAsset: HumanVisualAssetSpec = {
-  id: "ai4animation-worker",
-  name: "AI4Animation Worker",
+  id: "ai4animation-cranberry",
+  name: "AI4Animation Cranberry",
   glbPath: "/assets/human/ai4animation/worker.glb",
-  scale: 1,
-  scenePosition: [0.15, -0.5, 0],
-  sceneRotationEulerDeg: [0, 0, 90],
+  scale: 1.02,
+  scenePosition: [0, 0, 0],
+  sceneRotationEulerDeg: [0, 0, 0],
   animationMap: {
     lift_assist: "lift_panel",
     position_assist: "handover_support",

@@ -1,0 +1,85 @@
+<mujoco model="HitLimb_up.SLDASM">
+    <include file="../common/skybox.xml"/>
+    <include file="../common/visual.xml"/>
+    <include file="../common/materials.xml"/>
+    <!--compiler inertiafromgeom="auto" angle="radian" balanceinertia="true" boundmass="0.001" boundinertia="0.001"></compiler-->
+    <option timestep="0.001" >
+        <flag contact="disable"/>
+    </option>
+    <size njmax="500" nconmax="100" nuserdata="1"/>
+    <default>
+        <joint limited="false" damping="0"></joint>
+        <position gear="1"  kp="100"/>
+        <velocity gear="1"  kv="1"/>
+	</default>
+    <asset>
+        <mesh name="base_link" file="base_link.STL" />
+        <mesh name="Link1" file="Link1.STL" />
+        <mesh name="Link2" file="Link2.STL" />
+        <mesh name="Link3" file="Link3.STL" />
+        <mesh name="Link4" file="Link4.STL" />
+        <mesh name="Link5" file="Link5.STL" />
+        <mesh name="Link6" file="Link6.STL" />
+    </asset>
+    <equality>
+        <weld name="ikweld" body1="Link6" body2='ikdummy' active="true"></weld>
+    </equality>
+    <worldbody>
+        <body name="ikdummy" mocap="true" pos="0.900 0.000 0.093">
+	    	<geom conaffinity="0" contype="0" pos="0 0 0" rgba="1.0 0.0 0.0 1.0" size="0.01 0.01 0.01" type="box"></geom>
+	    </body> 
+        <geom name="floor" pos="0 0 0" size="10 10 0.125" material='grid' type="plane" condim="3"></geom>
+        <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="base_link" />
+        <body name="Link1" pos="0 0 0">
+            <inertial pos="0.022166 -3.7176e-05 0.091151" quat="0.552694 0.441194 0.440915 0.552694" mass="1.8917" diaginertia="0.0026457 0.00173295 0.00160595" />
+            <joint name="joint1" pos="0 0 0" axis="0 0 1" />
+            <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="Link1" />
+            <body name="Link2" pos="0.083 0 0.09315">
+                <inertial pos="0.20571 -0.0001747 -0.0031399" quat="0.483851 0.515809 0.511948 0.487583" mass="0.34874" diaginertia="0.000635422 0.000606067 8.9008e-05" />
+                <joint name="joint2" pos="0 0 0" axis="0 -1 0" />
+                <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="Link2" />
+                <body name="Link3" pos="0.39094 0 -0.029583">
+                    <inertial pos="0.12764 2.058e-05 0.023302" quat="0.5241 0.474985 0.474344 0.524124" mass="0.34662" diaginertia="0.00046565 0.000429844 0.000104536" />
+                    <joint name="joint3" pos="0 0 0" axis="0 -1 0" />
+                    <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="Link3" />
+                    <body name="Link4" pos="0.33481 0 0.029583">
+                        <inertial pos="0.012 0.00068149 0.00063139" quat="0.270511 0.653329 0.270686 0.653234" mass="0.10584" diaginertia="2.97897e-05 2.83803e-05 2.063e-05" />
+                        <joint name="joint4" pos="0 0 0" axis="0 0 -1" />
+                        <geom type="mesh" rgba="0.69804 0.69804 0.69804 1" mesh="Link4" />
+                        <body name="Link5" pos="0.024 0 0">
+                            <inertial pos="0.039742 4.9991e-05 0.01093" quat="0.703323 0.0730491 0.0730551 0.703323" mass="0.1029" diaginertia="2.9667e-05 2.3548e-05 1.7251e-05" />
+                            <joint name="joint5" pos="0 0 0" axis="0 -1 0" />
+                            <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="Link5" />
+                            <body name="Link6" pos="0.067104 0 0">
+                                <inertial pos="-0.0032895 2.6371e-05 0.016295" quat="0.999992 0.000457298 -0.0040402 -6.55517e-06" mass="0.0075822" diaginertia="4.6713e-06 3.084e-06 1.6139e-06" />
+                                <joint name="joint6" pos="0 0 0" axis="-1 0 0" />
+                                <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="Link6" />
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+    <actuator>
+        <!--motor name="motor_1"       gear="200" joint="joint2" />
+        <position name="motor_p1" joint="joint1" kp="100"/>
+        <velocity name="motor_v1" joint="joint1" />
+        <position name="motor_p2" joint="joint2" kp="100"/>
+        <velocity name="motor_v2" joint="joint2" />
+        <position name="motor_p3" joint="joint3" kp="100"/>
+        <velocity name="motor_v3" joint="joint3" />
+        <position name="motor_p4" joint="joint4" kp="100"/>
+        <velocity name="motor_v4" joint="joint4" />
+        <position name="motor_p5" joint="joint5" kp="100"/>
+        <velocity name="motor_v5" joint="joint5" />
+        <position name="motor_p6" joint="joint6" kp="100"/>
+        <velocity name="motor_v6" joint="joint6" /-->
+        <motor name="motor_1" gear="1" joint="joint1" />
+        <motor name="motor_2" gear="1" joint="joint2" />
+        <motor name="motor_3" gear="1" joint="joint3" />
+        <motor name="motor_4" gear="1" joint="joint4" />
+        <motor name="motor_5" gear="1" joint="joint5" />
+        <motor name="motor_6" gear="1" joint="joint6" />
+	</actuator>
+</mujoco>

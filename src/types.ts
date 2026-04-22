@@ -37,6 +37,56 @@ export interface HumanJointState {
   wrist: number;
 }
 
+export interface TrackedVector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface TrackedHandState {
+  wrist: TrackedVector3;
+  indexMcp: TrackedVector3;
+  pinkyMcp: TrackedVector3;
+  middleMcp: TrackedVector3;
+  ringMcp: TrackedVector3;
+  thumbMcp: TrackedVector3;
+  thumbIp: TrackedVector3;
+  indexTip: TrackedVector3;
+  indexPip: TrackedVector3;
+  indexDip: TrackedVector3;
+  thumbTip: TrackedVector3;
+  middlePip: TrackedVector3;
+  middleDip: TrackedVector3;
+  middleTip: TrackedVector3;
+  ringPip: TrackedVector3;
+  ringDip: TrackedVector3;
+  ringTip: TrackedVector3;
+  pinkyPip: TrackedVector3;
+  pinkyDip: TrackedVector3;
+  pinkyTip: TrackedVector3;
+  handSize: number;
+  openness: number;
+  pinch: number;
+}
+
+export interface TrackedArmState {
+  visible: boolean;
+  shoulder: TrackedVector3;
+  elbow: TrackedVector3;
+  wrist: TrackedVector3;
+  hand?: TrackedHandState;
+}
+
+export interface LiveUpperBodyState {
+  enabled: boolean;
+  source: "camera";
+  bodyScale?: number;
+  torsoYaw?: number;
+  torsoLean?: number;
+  leftArm?: TrackedArmState;
+  rightArm?: TrackedArmState;
+}
+
 export interface HumanPoseFrame {
   t: number;
   root: [number, number];
@@ -81,6 +131,7 @@ export interface HumanState {
   hand: [number, number];
   joints: HumanJointState;
   targetZoneId: string;
+  liveUpperBody?: LiveUpperBodyState;
 }
 
 export interface RobotState {

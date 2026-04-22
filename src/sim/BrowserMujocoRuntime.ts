@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import { Reflector } from "three/examples/jsm/objects/Reflector.js";
 import { humanVisualAsset } from "../data/catalog";
 import type { HumanState, SkillCall } from "../types";
 import { humanHandToMocap, prepareMjcfAssets, writeAssetsToVfs } from "./mjcfAssetLoader";
@@ -21,6 +22,13 @@ interface RuntimeOptions {
   onState?: (state: RuntimeRobotState) => void;
 }
 
+interface ImportedHumanMotion {
+  boneNames: string[];
+  frameRate: number;
+  positions: number[][][];
+  quaternions: number[][][];
+}
+
 type MujocoModule = {
   FS_createDataFile: (...args: any[]) => void;
   FS_createPath: (...args: any[]) => void;
@@ -34,8 +42,8 @@ type MujocoModule = {
 const toColor = (r: number, g: number, b: number): THREE.Color => new THREE.Color(r, g, b);
 
 const createMenagerieGridTexture = (): THREE.CanvasTexture => {
-  const size = 1024;
-  const cells = 20;
+  const size = 512;
+  const tileSize = 64;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -47,22 +55,17 @@ const createMenagerieGridTexture = (): THREE.CanvasTexture => {
     return fallback;
   }
 
-  const primary = "#19334c";
-  const secondary = "#334c66";
-  const edge = "#47627c";
-  const cellSize = size / cells;
-
-  for (let row = 0; row < cells; row += 1) {
-    for (let column = 0; column < cells; column += 1) {
-      context.fillStyle = (row + column) % 2 === 0 ? primary : secondary;
-      context.fillRect(column * cellSize, row * cellSize, cellSize, cellSize);
+  for (let row = 0; row < size; row += tileSize) {
+    for (let column = 0; column < size; column += tileSize) {
+      const isEven = ((column / tileSize) + (row / tileSize)) % 2 === 0;
+      context.fillStyle = isEven ? "#4d77a8" : "#345f91";
+      context.fillRect(column, row, tileSize, tileSize);
     }
   }
 
-  context.strokeStyle = edge;
-  context.lineWidth = 2;
-  for (let index = 0; index <= cells; index += 1) {
-    const offset = index * cellSize;
+  context.strokeStyle = "rgba(225, 238, 255, 0.64)";
+  context.lineWidth = 2.5;
+  for (let offset = 0; offset <= size; offset += tileSize) {
     context.beginPath();
     context.moveTo(offset, 0);
     context.lineTo(offset, size);
@@ -77,7 +80,7 @@ const createMenagerieGridTexture = (): THREE.CanvasTexture => {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(1, 1);
+  texture.repeat.set(18, 18);
   texture.anisotropy = 8;
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
@@ -241,6 +244,8 @@ export class BrowserMujocoRuntime {
     { bodyName: "Link6", offset: [0.067104, 0, 0] as const, axis: [-1, 0, 0] as const },
   ];
 
+  private static readonly WEARABLE_MOUNT_BONE = "b_spine3";
+
   private readonly canvas: HTMLCanvasElement;
 
   private readonly onState?: RuntimeOptions["onState"];
@@ -295,6 +300,12 @@ export class BrowserMujocoRuntime {
 
   private humanActions = new Map<string, THREE.AnimationAction>();
 
+  private humanBones = new Map<string, THREE.Object3D>();
+
+  private humanRestQuaternions = new Map<string, THREE.Quaternion>();
+
+  private importedHumanMotion?: ImportedHumanMotion;
+
   private hasHumanMesh = false;
 
   private proxyLeftHand?: THREE.Mesh;
@@ -325,6 +336,9 @@ export class BrowserMujocoRuntime {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
     this.resizeRenderer();
 
     this.camera = new THREE.PerspectiveCamera(
@@ -338,7 +352,8 @@ export class BrowserMujocoRuntime {
     this.camera.lookAt(0.52, 0, 0.45);
 
     this.scene = new THREE.Scene();
-    this.scene.background = toColor(0.4, 0.6, 0.8);
+    this.scene.background = new THREE.Color("#6f95c2");
+    this.scene.fog = new THREE.Fog("#80a2cb", 7, 22);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
@@ -365,32 +380,56 @@ export class BrowserMujocoRuntime {
     this.mirroredExolimbRoot.scale.set(1, -1, 1);
     this.wearableRoot.add(this.mirroredExolimbRoot);
 
-    this.scene.add(new THREE.AmbientLight(toColor(0.4, 0.4, 0.4), 1));
+    this.scene.add(new THREE.HemisphereLight(0xdbe9ff, 0x46678f, 0.9));
 
-    const keyLight = new THREE.DirectionalLight(toColor(0.8, 0.8, 0.8), 2.1);
-    keyLight.position.set(3.6, -2.8, 5.4);
+    const keyLight = new THREE.DirectionalLight(0xfff2d8, 2.2);
+    keyLight.position.set(4.1, -3.0, 7.2);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(2048, 2048);
     keyLight.shadow.bias = -0.0002;
-    keyLight.shadow.radius = 3;
+    keyLight.shadow.normalBias = 0.02;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.camera.left = -4;
+    keyLight.shadow.camera.right = 4;
+    keyLight.shadow.camera.top = 4;
+    keyLight.shadow.camera.bottom = -4;
     this.scene.add(keyLight);
 
-    const fillLight = new THREE.DirectionalLight(toColor(0.55, 0.66, 0.76), 0.9);
-    fillLight.position.set(-2.8, 1.8, 3.2);
+    const fillLight = new THREE.DirectionalLight(0x9dcaff, 0.45);
+    fillLight.position.set(-4.2, 2.7, 4.0);
     this.scene.add(fillLight);
 
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.22);
+    rimLight.position.set(1.2, 4.5, 3.0);
+    this.scene.add(rimLight);
+
     this.groundTexture = createMenagerieGridTexture();
+    const pixelRatio = Math.min(window.devicePixelRatio, 2);
+    const floorReflector = new Reflector(new THREE.PlaneGeometry(24, 24), {
+      textureWidth: Math.floor(this.canvas.clientWidth * pixelRatio),
+      textureHeight: Math.floor(this.canvas.clientHeight * pixelRatio),
+      color: 0x5d86b4,
+      clipBias: 0.003,
+    });
+    floorReflector.position.z = -0.003;
+    this.scene.add(floorReflector);
+
     const stage = new THREE.Mesh(
-      new THREE.PlaneGeometry(10, 10),
-      new THREE.MeshStandardMaterial({
-        color: "#ffffff",
+      new THREE.PlaneGeometry(24, 24),
+      new THREE.MeshPhysicalMaterial({
         map: this.groundTexture,
-        roughness: 0.9,
-        metalness: 0.04,
+        transparent: true,
+        opacity: 0.96,
+        roughness: 0.1,
+        metalness: 0.06,
+        clearcoat: 0.72,
+        clearcoatRoughness: 0.14,
+        reflectivity: 0.7,
       }),
     );
     stage.receiveShadow = true;
-    stage.position.z = -0.002;
+    stage.position.z = -0.0015;
     this.scene.add(stage);
 
     this.floorShadow = new THREE.Mesh(
@@ -589,7 +628,18 @@ export class BrowserMujocoRuntime {
           child.receiveShadow = true;
         }
       });
+      gltf.scene.traverse((child) => {
+        if (child.name) {
+          this.humanBones.set(child.name, child);
+          this.humanRestQuaternions.set(child.name, child.quaternion.clone());
+        }
+      });
       root.add(gltf.scene);
+      root.updateMatrixWorld(true);
+      const wearableMount = this.humanBones.get(BrowserMujocoRuntime.WEARABLE_MOUNT_BONE);
+      if (wearableMount && this.wearableRoot) {
+        wearableMount.attach(this.wearableRoot);
+      }
       this.humanMixer = new THREE.AnimationMixer(gltf.scene);
       gltf.animations.forEach((clip) => {
         const action = this.humanMixer?.clipAction(clip);
@@ -600,6 +650,10 @@ export class BrowserMujocoRuntime {
           this.humanActions.set(clip.name, action);
         }
       });
+      const response = await fetch("/assets/human/ai4animation/motions/cranberry_walk_forward_local.json");
+      if (response.ok) {
+        this.importedHumanMotion = (await response.json()) as ImportedHumanMotion;
+      }
     } catch {
       this.hasHumanMesh = false;
       const bodyMaterial = new THREE.MeshStandardMaterial({
@@ -737,6 +791,7 @@ export class BrowserMujocoRuntime {
       }
 
       this.humanMixer?.update(0);
+      this.syncHumanVisual();
       this.syncVisuals();
       this.controls?.update();
       this.updatePresentationShadow();
@@ -851,6 +906,53 @@ export class BrowserMujocoRuntime {
 
     this.humanRoot.visible = true;
 
+    const gaitPhase = this.currentHuman.time * 2.4;
+    const liveUpperBody = this.currentHuman.liveUpperBody;
+    const useLiveUpperBody =
+      this.currentHuman.clipId === "camera-live" &&
+      liveUpperBody?.enabled &&
+      this.humanBones.size > 0;
+    const useImportedMotion =
+      !useLiveUpperBody &&
+      this.currentHuman.clipId === "lift-assist" &&
+      Boolean(this.importedHumanMotion) &&
+      this.humanBones.size > 0;
+    const swayX = Math.sin(gaitPhase) * 0.05;
+    const swayY = Math.cos(gaitPhase * 0.5) * 0.04;
+    const bobZ = Math.abs(Math.sin(gaitPhase)) * 0.06;
+    const rootX = useLiveUpperBody
+      ? -0.6
+      : useImportedMotion
+        ? -0.58
+        : -0.82 + (this.currentHuman.root[0] - 22) * 0.24 + swayX;
+    const rootY = useImportedMotion
+      ? -0.18
+      : useLiveUpperBody
+        ? -0.16
+      : -0.7 + (72 - this.currentHuman.root[1]) * 0.2 + (this.currentHuman.root[0] - 22) * 0.03 + swayY;
+    this.humanRoot.position.set(rootX, rootY, useImportedMotion || useLiveUpperBody ? 0 : bobZ);
+    this.humanRoot.scale.setScalar(useLiveUpperBody ? liveUpperBody?.bodyScale ?? 1 : 1);
+
+    const handX = -0.64 + (this.currentHuman.hand[0] - 34) * 0.022;
+    const handZ = 0.82 + (60 - this.currentHuman.hand[1]) * 0.028;
+    const shoulderBias = THREE.MathUtils.clamp((this.currentHuman.joints.shoulder - 30) / 90, -0.35, 0.45);
+    const elbowBias = THREE.MathUtils.clamp((this.currentHuman.joints.elbow - 45) / 120, -0.18, 0.3);
+    this.humanRoot.rotation.set(
+      useImportedMotion || useLiveUpperBody ? 0 : Math.sin(gaitPhase * 0.5) * 0.08,
+      useImportedMotion || useLiveUpperBody
+        ? liveUpperBody?.torsoYaw ?? 0
+        : shoulderBias * 0.28 + Math.cos(gaitPhase * 0.5) * 0.05,
+      useImportedMotion || useLiveUpperBody
+        ? Math.PI / 2 + (liveUpperBody?.torsoLean ?? 0)
+        : shoulderBias * 0.4 + elbowBias * 0.18 + Math.sin(gaitPhase) * 0.09,
+    );
+
+    if (useImportedMotion) {
+      this.applyImportedHumanMotion(this.currentHuman.time);
+    } else if (useLiveUpperBody) {
+      this.applyLiveUpperBodyPose();
+    }
+
     const animationName =
       this.currentHuman.clipId === "lift-assist"
         ? humanVisualAsset.animationMap.lift_assist
@@ -858,41 +960,314 @@ export class BrowserMujocoRuntime {
           ? humanVisualAsset.animationMap.position_assist
           : humanVisualAsset.animationMap.compliance_support;
 
-    if (this.humanMixer && this.humanActions.size > 0) {
+    if (!useLiveUpperBody && this.humanMixer && this.humanActions.size > 0) {
+      const fallbackAction = this.humanActions.values().next().value as
+        | THREE.AnimationAction
+        | undefined;
+      const activeAction =
+        (animationName ? this.humanActions.get(animationName) : undefined) ?? fallbackAction;
+
       this.humanActions.forEach((action, name) => {
-        const active = name === animationName || (!animationName && this.humanActions.size === 1);
+        const active = action === activeAction || name === animationName;
         action.enabled = active;
         action.weight = active ? 1 : 0;
         action.paused = true;
       });
 
-      const activeAction =
-        (animationName ? this.humanActions.get(animationName) : undefined) ??
-        this.humanActions.values().next().value;
       const clipDuration = activeAction?.getClip().duration ?? 1;
       if (activeAction) {
-        activeAction.time = ((this.currentHuman.time % clipDuration) + clipDuration) % clipDuration;
+        this.humanMixer.setTime(
+          ((this.currentHuman.time % clipDuration) + clipDuration) % clipDuration,
+        );
       }
-      return;
     }
 
-    const rootX = this.fallbackActive ? 0.12 : -0.9 + (this.currentHuman.root[0] / 100) * 0.16;
-    const rootY = this.fallbackActive ? 0.02 : -0.78 + ((100 - this.currentHuman.root[1]) / 100) * 0.12;
-    this.humanRoot.position.set(rootX, rootY, 0);
-    this.humanRoot.rotation.set(0, 0, this.fallbackActive ? Math.PI / 2 : 0);
-
-    const handX = this.fallbackActive ? 0.28 : -0.72 + (this.currentHuman.hand[0] / 100) * 0.18;
-    const handZ = this.fallbackActive ? 0.98 : 0.65 + ((100 - this.currentHuman.hand[1]) / 100) * 0.75;
     if (this.proxyRightHand) {
-      this.proxyRightHand.position.set(handX, this.fallbackActive ? -0.08 : -0.18, handZ);
+      this.proxyRightHand.position.set(handX, -0.18, handZ);
     }
     if (this.proxyLeftHand) {
       this.proxyLeftHand.position.set(
-        this.fallbackActive ? 0.18 : handX * 0.88,
-        this.fallbackActive ? 0.08 : 0.18,
-        this.fallbackActive ? 0.88 : handZ * 0.98,
+        handX * 0.88,
+        0.18,
+        handZ * 0.98,
       );
     }
+  }
+
+  private applyImportedHumanMotion(time: number): void {
+    if (!this.importedHumanMotion) {
+      return;
+    }
+
+    const frameCount = this.importedHumanMotion.positions.length;
+    if (frameCount === 0) {
+      return;
+    }
+
+    const frameIndex =
+      Math.floor((((time * this.importedHumanMotion.frameRate) % frameCount) + frameCount) % frameCount);
+    const positions = this.importedHumanMotion.positions[frameIndex];
+    const quaternions = this.importedHumanMotion.quaternions[frameIndex];
+
+    for (let index = 0; index < this.importedHumanMotion.boneNames.length; index += 1) {
+      const boneName = this.importedHumanMotion.boneNames[index];
+      const bone = this.humanBones.get(boneName);
+      const position = positions[index];
+      const quaternion = quaternions[index];
+      if (!bone || !position || !quaternion) {
+        continue;
+      }
+      bone.position.set(position[0] ?? 0, position[1] ?? 0, position[2] ?? 0);
+      bone.quaternion.set(
+        quaternion[0] ?? 0,
+        quaternion[1] ?? 0,
+        quaternion[2] ?? 0,
+        quaternion[3] ?? 1,
+      );
+    }
+  }
+
+  private applyLiveUpperBodyPose(): void {
+    const liveUpperBody = this.currentHuman?.liveUpperBody;
+    if (!liveUpperBody?.enabled) {
+      return;
+    }
+
+    this.applyTrackedArmPose("left", liveUpperBody.leftArm);
+    this.applyTrackedArmPose("right", liveUpperBody.rightArm);
+  }
+
+  private applyTrackedArmPose(side: "left" | "right", arm?: NonNullable<HumanState["liveUpperBody"]>["leftArm"]): void {
+    const armBone = this.humanBones.get(`b_${side[0]}_arm`);
+    const forearmBone = this.humanBones.get(`b_${side[0]}_forearm`);
+    const wristTwistBone = this.humanBones.get(`b_${side[0]}_wrist_twist`);
+    const wristBone = this.humanBones.get(`b_${side[0]}_wrist`);
+    const shoulderBone = this.humanBones.get(`b_${side[0]}_shoulder`);
+
+    if (!arm?.visible || !armBone || !forearmBone || !wristBone) {
+      this.restoreTrackedHand(side);
+      return;
+    }
+
+    this.rotateBoneTowards(
+      `b_${side[0]}_arm`,
+      this.mapTrackingVector(arm.elbow, arm.shoulder),
+      `b_${side[0]}_forearm`,
+    );
+    this.rotateBoneTowards(
+      `b_${side[0]}_forearm`,
+      this.mapTrackingVector(arm.wrist, arm.elbow),
+      `b_${side[0]}_wrist`,
+    );
+
+    if (shoulderBone) {
+      const shoulderLift = THREE.MathUtils.clamp((arm.shoulder.y - arm.elbow.y) * -1.6, -0.35, 0.55);
+      shoulderBone.rotation.z = side === "left" ? shoulderLift : -shoulderLift;
+      shoulderBone.rotation.y = side === "left" ? 0.12 : -0.12;
+    }
+
+    if (arm.hand) {
+      const handAxis = this.mapTrackingVector(arm.hand.indexMcp, arm.hand.pinkyMcp).normalize();
+      const forwardAxis = this.mapTrackingVector(arm.hand.middleMcp, arm.hand.wrist).normalize();
+      this.orientWristBone(
+        `b_${side[0]}_wrist`,
+        handAxis,
+        forwardAxis,
+        side,
+        arm.hand.openness,
+        arm.hand.pinch,
+        arm.hand.handSize,
+      );
+      if (wristTwistBone) {
+        const twistSign = side === "left" ? -1 : 1;
+        wristTwistBone.rotation.x = twistSign * THREE.MathUtils.clamp(handAxis.z * 0.8, -0.5, 0.5);
+      }
+      this.applyTrackedThumbPose(side, arm.hand.wrist, arm.hand.thumbMcp, arm.hand.thumbIp, arm.hand.thumbTip);
+      this.applyTrackedFingerPose(side, "index", arm.hand.indexMcp, arm.hand.indexPip, arm.hand.indexDip, arm.hand.indexTip);
+      this.applyTrackedFingerPose(side, "middle", arm.hand.middleMcp, arm.hand.middlePip, arm.hand.middleDip, arm.hand.middleTip);
+      this.applyTrackedFingerPose(side, "ring", arm.hand.ringMcp, arm.hand.ringPip, arm.hand.ringDip, arm.hand.ringTip);
+      this.applyTrackedFingerPose(side, "pinky", arm.hand.pinkyMcp, arm.hand.pinkyPip, arm.hand.pinkyDip, arm.hand.pinkyTip);
+      this.applyFingerCurl(side, arm.hand.openness, arm.hand.pinch, arm.hand.handSize);
+    } else {
+      this.restoreTrackedHand(side);
+    }
+  }
+
+  private rotateBoneTowards(boneName: string, desiredDirection: THREE.Vector3, childName: string): void {
+    const bone = this.humanBones.get(boneName);
+    const child = this.humanBones.get(childName);
+    const restQuaternion = this.humanRestQuaternions.get(boneName);
+    if (!bone || !child || !bone.parent || !restQuaternion || desiredDirection.lengthSq() < 1e-6) {
+      return;
+    }
+
+    const restDirection = child.position.clone().normalize();
+    if (restDirection.lengthSq() < 1e-6) {
+      return;
+    }
+
+    const parentWorldQuaternion = new THREE.Quaternion();
+    bone.parent.getWorldQuaternion(parentWorldQuaternion);
+    const desiredDirectionInParent = desiredDirection
+      .clone()
+      .normalize()
+      .applyQuaternion(parentWorldQuaternion.invert());
+    const restDirectionInParent = restDirection.clone().applyQuaternion(restQuaternion);
+    const delta = new THREE.Quaternion().setFromUnitVectors(
+      restDirectionInParent.normalize(),
+      desiredDirectionInParent.normalize(),
+    );
+    bone.quaternion.copy(delta.multiply(restQuaternion.clone())).normalize();
+  }
+
+  private orientWristBone(
+    boneName: string,
+    lateralAxis: THREE.Vector3,
+    forwardAxis: THREE.Vector3,
+    side: "left" | "right",
+    openness: number,
+    pinch: number,
+    handSize: number,
+  ): void {
+    const bone = this.humanBones.get(boneName);
+    const restQuaternion = this.humanRestQuaternions.get(boneName);
+    if (!bone || !restQuaternion) {
+      return;
+    }
+
+    bone.quaternion.copy(restQuaternion);
+    const gripBias = THREE.MathUtils.clamp(1 - pinch, 0, 1);
+    const sizeBias = THREE.MathUtils.clamp((handSize - 0.07) * 4.0, -0.12, 0.18);
+    const roll = THREE.MathUtils.clamp((1 - openness) * 0.38 + gripBias * 0.28 + sizeBias, -0.3, 0.68);
+    const yaw = THREE.MathUtils.clamp(lateralAxis.y * 1.2 + forwardAxis.y * 0.5, -0.6, 0.6);
+    const pitch = THREE.MathUtils.clamp(lateralAxis.z * 1.2 + forwardAxis.z * 1.1, -0.75, 0.75);
+    bone.rotateX(side === "left" ? pitch : -pitch);
+    bone.rotateY(side === "left" ? yaw : -yaw);
+    bone.rotateZ(side === "left" ? -roll : roll);
+  }
+
+  private applyFingerCurl(side: "left" | "right", openness: number, pinch: number, handSize: number): void {
+    const gripBias = THREE.MathUtils.clamp(1 - pinch, 0, 1);
+    const spreadBias = THREE.MathUtils.clamp((handSize - 0.08) * 3.2, -0.12, 0.18);
+    const curl = THREE.MathUtils.clamp(1 - openness * 0.72 + gripBias * 0.52 - spreadBias, 0, 1);
+    const pinchCurl = THREE.MathUtils.clamp(gripBias + 0.28 - spreadBias, 0, 1);
+    const digits = ["index", "middle", "ring", "pinky"] as const;
+    digits.forEach((digit) => {
+      const base = this.humanBones.get(`b_${side[0]}_${digit}1`);
+      const mid = this.humanBones.get(`b_${side[0]}_${digit}2`);
+      const tip = this.humanBones.get(`b_${side[0]}_${digit}3`);
+      const sign = side === "left" ? -1 : 1;
+      if (base) {
+        base.rotation.y = sign * curl * 0.82;
+      }
+      if (mid) {
+        mid.rotation.y = sign * curl * 0.96;
+      }
+      if (tip) {
+        tip.rotation.y = sign * curl * 0.7;
+      }
+    });
+
+    const thumb0 = this.humanBones.get(`b_${side[0]}_thumb0`);
+    const thumb1 = this.humanBones.get(`b_${side[0]}_thumb1`);
+    const thumb2 = this.humanBones.get(`b_${side[0]}_thumb2`);
+    const thumb3 = this.humanBones.get(`b_${side[0]}_thumb3`);
+    const thumbSign = side === "left" ? 1 : -1;
+    if (thumb0) {
+      thumb0.rotation.z = thumbSign * (0.22 + pinchCurl * 0.3);
+    }
+    if (thumb1) {
+      thumb1.rotation.y = thumbSign * pinchCurl * 0.45;
+    }
+    if (thumb2) {
+      thumb2.rotation.y = thumbSign * pinchCurl * 0.55;
+    }
+    if (thumb3) {
+      thumb3.rotation.y = thumbSign * pinchCurl * 0.35;
+    }
+  }
+
+  private applyTrackedFingerPose(
+    side: "left" | "right",
+    finger: "thumb" | "index" | "middle" | "ring" | "pinky",
+    joint0: { x: number; y: number; z: number },
+    joint1: { x: number; y: number; z: number },
+    joint2: { x: number; y: number; z: number },
+    joint3?: { x: number; y: number; z: number },
+  ): void {
+    const prefix = `b_${side[0]}_${finger}`;
+    const bone1 = this.humanBones.get(`${prefix}1`);
+    const bone2 = this.humanBones.get(`${prefix}2`);
+    const bone3 = this.humanBones.get(`${prefix}3`);
+    if (bone1 && joint0 && joint1) {
+      this.rotateBoneTowards(`${prefix}1`, this.mapTrackingVector(joint1, joint0), `${prefix}2`);
+    }
+    if (bone2 && joint1 && joint2) {
+      this.rotateBoneTowards(`${prefix}2`, this.mapTrackingVector(joint2, joint1), `${prefix}3`);
+    }
+    if (bone3 && joint2 && joint3) {
+      const nullName = `${prefix}_null`;
+      if (this.humanBones.has(nullName)) {
+        this.rotateBoneTowards(`${prefix}3`, this.mapTrackingVector(joint3, joint2), nullName);
+      }
+    }
+  }
+
+  private applyTrackedThumbPose(
+    side: "left" | "right",
+    wrist: { x: number; y: number; z: number },
+    mcp: { x: number; y: number; z: number },
+    ip: { x: number; y: number; z: number },
+    tip: { x: number; y: number; z: number },
+  ): void {
+    const prefix = `b_${side[0]}_thumb`;
+    if (this.humanBones.get(`${prefix}0`) && this.humanBones.get(`${prefix}1`)) {
+      this.rotateBoneTowards(`${prefix}0`, this.mapTrackingVector(mcp, wrist), `${prefix}1`);
+    }
+    if (this.humanBones.get(`${prefix}1`) && this.humanBones.get(`${prefix}2`)) {
+      this.rotateBoneTowards(`${prefix}1`, this.mapTrackingVector(ip, mcp), `${prefix}2`);
+    }
+    if (this.humanBones.get(`${prefix}2`) && this.humanBones.get(`${prefix}3`)) {
+      this.rotateBoneTowards(`${prefix}2`, this.mapTrackingVector(tip, ip), `${prefix}3`);
+    }
+  }
+
+  private restoreTrackedHand(side: "left" | "right"): void {
+    const bonePrefix = `b_${side[0]}_`;
+    [
+      `${bonePrefix}wrist`,
+      `${bonePrefix}wrist_twist`,
+      `${bonePrefix}thumb0`,
+      `${bonePrefix}thumb1`,
+      `${bonePrefix}thumb2`,
+      `${bonePrefix}thumb3`,
+      `${bonePrefix}index1`,
+      `${bonePrefix}index2`,
+      `${bonePrefix}index3`,
+      `${bonePrefix}middle1`,
+      `${bonePrefix}middle2`,
+      `${bonePrefix}middle3`,
+      `${bonePrefix}ring1`,
+      `${bonePrefix}ring2`,
+      `${bonePrefix}ring3`,
+      `${bonePrefix}pinky1`,
+      `${bonePrefix}pinky2`,
+      `${bonePrefix}pinky3`,
+      `${bonePrefix}shoulder`,
+    ].forEach((boneName) => {
+      const bone = this.humanBones.get(boneName);
+      const restQuaternion = this.humanRestQuaternions.get(boneName);
+      if (bone && restQuaternion) {
+        bone.quaternion.copy(restQuaternion);
+      }
+    });
+  }
+
+  private mapTrackingVector(
+    to: { x: number; y: number; z: number },
+    from: { x: number; y: number; z: number },
+  ): THREE.Vector3 {
+    return new THREE.Vector3(-(to.z - from.z), to.x - from.x, -(to.y - from.y));
   }
 
   private applyFallbackPose(): void {

@@ -283,6 +283,10 @@ h3 {
   max-width: min(22rem, calc(100vw - 2rem));
 }
 
+.camera-hud {
+  max-width: min(26rem, calc(100vw - 2rem));
+}
+
 .hud-bottom {
   left: 1rem;
   right: 1rem;
@@ -382,6 +386,49 @@ h3 {
   padding: 0.85rem 1rem;
   border-radius: 1.15rem;
   max-width: 100%;
+}
+
+.camera-panel {
+  width: min(25rem, calc(100vw - 2rem));
+  padding: 0.85rem;
+  border-radius: 1.25rem;
+}
+
+.camera-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.camera-panel-header strong {
+  display: block;
+  color: #203246;
+}
+
+.camera-debug {
+  margin-bottom: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.8rem;
+  background: rgba(15, 23, 42, 0.08);
+  color: #334155;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.camera-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.82));
+  object-fit: cover;
+}
+
+.camera-video-hidden {
+  display: none;
 }
 
 .status-note strong {

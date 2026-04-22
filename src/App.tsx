@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { analyzeSceneWithGemini, type GeminiSpatialResult } from "./ai/gemini";
+import { WebcamUpperBodyPanel } from "./camera/WebcamUpperBodyPanel";
 import { advanceExecution, createIdleExecutionState } from "./ai/executor";
 import { buildExecutionPlan } from "./ai/planner";
 import { defaultTasks, factoryScene, humanMotionClips } from "./data/catalog";
@@ -11,6 +12,7 @@ import {
 } from "./sim/MujocoViewport";
 import type {
   ExecutionPlan,
+  HumanState,
   HumanMotionClip,
   PlanExecutionState,
   SimulationSnapshot,
@@ -69,6 +71,8 @@ export default function App() {
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [spatialResult, setSpatialResult] = useState<GeminiSpatialResult | null>(null);
+  const [cameraDriveEnabled, setCameraDriveEnabled] = useState(false);
+  const [cameraHuman, setCameraHuman] = useState<HumanState | null>(null);
   const [robotRuntime, setRobotRuntime] = useState<RuntimeRobotViewState>({
     endEffector: [0, 0, 0],
     target: [0, 0, 0],
@@ -88,6 +92,7 @@ export default function App() {
   }, [selectedTaskId, taskText]);
 
   const activeClip = useMemo(() => getClipForTask(selectedTask.taskType), [selectedTask.taskType]);
+  const displayHuman = cameraDriveEnabled && cameraHuman ? cameraHuman : snapshot.human;
   const activeSkillLabel =
     jointTest
       ? "六轴测试"
@@ -126,6 +131,7 @@ export default function App() {
     setSpatialResult(null);
     setAnalysisError(null);
     setRunning(false);
+    setCameraHuman(null);
   }, [activeClip, selectedTask]);
 
   useEffect(() => {
@@ -224,10 +230,16 @@ export default function App() {
     setAnalysisError(null);
     setRunning(false);
     setJointTest(false);
+    setCameraHuman(null);
   };
 
   const handleToggleJointTest = (): void => {
     setJointTest((previous) => !previous);
+  };
+
+  const handleToggleCameraDrive = (): void => {
+    setCameraDriveEnabled((previous) => !previous);
+    setCameraHuman(null);
   };
 
   const handleAnalyzeScene = async (): Promise<void> => {
@@ -256,7 +268,7 @@ export default function App() {
       <section className="hero-stage">
         <MujocoViewport
           ref={viewportRef}
-          human={snapshot.human}
+          human={displayHuman}
           activeSkill={execution.activeSkill}
           running={running}
           jointTest={jointTest}
@@ -273,6 +285,9 @@ export default function App() {
           <div className="hud-pills">
             <span className={`status-pill ${running ? "live" : ""}`}>{running ? "运行中" : "已暂停"}</span>
             <span className={`status-pill ${jointTest ? "live" : ""}`}>{jointTest ? "关节测试" : "任务模式"}</span>
+            <span className={`status-pill ${cameraDriveEnabled ? "live" : ""}`}>
+              {cameraDriveEnabled ? "Camera Drive" : "Preset Motion"}
+            </span>
             <span className="status-pill">{runtimeLabel}</span>
           </div>
         </div>
@@ -300,7 +315,7 @@ export default function App() {
             </div>
             <div className="mini-stat">
               <span>阶段</span>
-              <strong>{prettyPhase(snapshot.human.phase)}</strong>
+              <strong>{prettyPhase(displayHuman.phase)}</strong>
             </div>
             <div className="mini-stat">
               <span>技能</span>
@@ -325,11 +340,24 @@ export default function App() {
             <button className={`control ${jointTest ? "primary" : ""}`} onClick={handleToggleJointTest} type="button">
               {jointTest ? "停止测试" : "关节测试"}
             </button>
+            <button
+              className={`control ${cameraDriveEnabled ? "primary" : ""}`}
+              onClick={handleToggleCameraDrive}
+              type="button"
+            >
+              {cameraDriveEnabled ? "Close Camera" : "Camera Drive"}
+            </button>
             <button className="control accent" onClick={() => void handleAnalyzeScene()} type="button">
               {analysisBusy ? "分析中" : "分析"}
             </button>
           </div>
         </div>
+
+        {cameraDriveEnabled ? (
+          <div className="hud hud-right camera-hud">
+            <WebcamUpperBodyPanel enabled={cameraDriveEnabled} onHumanState={setCameraHuman} />
+          </div>
+        ) : null}
 
         {(analysisError ?? spatialResult) ? (
           <div className="hud hud-right">

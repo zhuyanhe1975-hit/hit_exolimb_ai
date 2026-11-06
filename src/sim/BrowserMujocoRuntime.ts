@@ -4,6 +4,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { Reflector } from "three/examples/jsm/objects/Reflector.js";
 import { humanVisualAsset } from "../data/catalog";
+import { publicUrl } from "../publicUrl";
 import type { HumanState, SkillCall } from "../types";
 import { humanHandToMocap, prepareMjcfAssets, writeAssetsToVfs } from "./mjcfAssetLoader";
 
@@ -87,7 +88,7 @@ const createMenagerieGridTexture = (): THREE.CanvasTexture => {
 };
 
 const loadMujocoModule = async (): Promise<MujocoModule> => {
-  const moduleUrl = "/vendor/mujoco/mujoco.js";
+  const moduleUrl = publicUrl("/vendor/mujoco/mujoco.js");
   const source = await fetch(moduleUrl);
   if (!source.ok) {
     throw new Error(`Failed to fetch MuJoCo runtime from ${moduleUrl}`);
@@ -117,7 +118,7 @@ const loadMujocoModule = async (): Promise<MujocoModule> => {
     return imported.default({
       mainScriptUrlOrBlob: moduleUrl,
       locateFile: (path: string) =>
-        path.endsWith(".wasm") ? "/vendor/mujoco/mujoco.wasm" : path,
+        path.endsWith(".wasm") ? publicUrl("/vendor/mujoco/mujoco.wasm") : path,
     });
   } finally {
     Object.defineProperty(globalThis, "SharedArrayBuffer", {
@@ -444,7 +445,7 @@ export class BrowserMujocoRuntime {
     this.floorShadow.position.set(0.55, 0, 0.008);
     this.scene.add(this.floorShadow);
 
-    const assets = await prepareMjcfAssets("/assets/mujoco/serial/hitexo.xml");
+    const assets = await prepareMjcfAssets(publicUrl("/assets/mujoco/serial/hitexo.xml"));
     this.fallbackBodyTransforms = parseDefaultBodyTransforms(assets.rootXml);
     this.fallbackBodyLinks = parseBodyLinks(assets.rootXml);
     await this.buildExolimbVisuals(assets.rootXml);
@@ -547,7 +548,7 @@ export class BrowserMujocoRuntime {
         promises.push(
           new Promise((resolve, reject) => {
             loader.load(
-              `/assets/mujoco/serial/${meshFile}`,
+              publicUrl(`/assets/mujoco/serial/${meshFile}`),
               (geometry) => {
                 geometry.computeVertexNormals();
                 const material = new THREE.MeshStandardMaterial({
@@ -650,7 +651,7 @@ export class BrowserMujocoRuntime {
           this.humanActions.set(clip.name, action);
         }
       });
-      const response = await fetch("/assets/human/ai4animation/motions/cranberry_walk_forward_local.json");
+      const response = await fetch(publicUrl("/assets/human/ai4animation/motions/cranberry_walk_forward_local.json"));
       if (response.ok) {
         this.importedHumanMotion = (await response.json()) as ImportedHumanMotion;
       }

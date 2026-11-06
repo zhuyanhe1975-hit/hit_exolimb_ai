@@ -1,3 +1,4 @@
+import { publicUrl } from "../publicUrl";
 import type {
   HumanModelSpec,
   HumanMotionClip,
@@ -61,7 +62,7 @@ export const humanModel: HumanModelSpec = {
 export const humanVisualAsset: HumanVisualAssetSpec = {
   id: "ai4animation-cranberry",
   name: "AI4Animation Cranberry",
-  glbPath: "/assets/human/ai4animation/worker.glb",
+  glbPath: publicUrl("/assets/human/ai4animation/worker.glb"),
   scale: 1.02,
   scenePosition: [0, 0, 0],
   sceneRotationEulerDeg: [0, 0, 0],

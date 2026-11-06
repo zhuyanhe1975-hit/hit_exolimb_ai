@@ -1,3 +1,4 @@
+import { publicUrl } from "../publicUrl";
 import type { SkillCall } from "../types";
 
 export interface AssetFileRecord {
@@ -14,7 +15,7 @@ export interface PreparedMjcfAssets {
   files: AssetFileRecord[];
 }
 
-const PUBLIC_ROOT = "/assets/mujoco";
+const PUBLIC_ROOT = publicUrl("/assets/mujoco").replace(/\/$/, "");
 
 const toVirtualPath = (publicPath: string): string => {
   const relative = publicPath.replace(`${PUBLIC_ROOT}/`, "");

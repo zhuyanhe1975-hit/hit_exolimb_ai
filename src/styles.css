@@ -302,6 +302,17 @@ h3 {
   letter-spacing: -0.03em;
 }
 
+.gemini-note {
+  margin-top: 0.45rem;
+  max-width: 28rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.86);
+  color: #3d4d61;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .hud-pills {
   display: flex;
   gap: 0.6rem;

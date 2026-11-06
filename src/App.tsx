@@ -104,6 +104,7 @@ export default function App() {
       : "Loading";
   const compactTaskLabel =
     defaultTasks.find((task) => task.id === selectedTaskId)?.userText ?? selectedTask.userText;
+  const geminiReady = Boolean(import.meta.env.VITE_GEMINI_API_KEY);
 
   useEffect(() => {
     const plan = buildExecutionPlan(selectedTask);
@@ -281,6 +282,11 @@ export default function App() {
           <div className="hud-brand">
             <span className="eyebrow">HIT ExoLimb AI</span>
             <h1>ExoLimb Viewer</h1>
+            {geminiReady ? null : (
+              <p className="gemini-note">
+                未配置 Gemini API Key。仿真、任务与动作演示可直接使用；场景分析是可选项，缺少密钥不会阻止页面打开。
+              </p>
+            )}
           </div>
           <div className="hud-pills">
             <span className={`status-pill ${running ? "live" : ""}`}>{running ? "运行中" : "已暂停"}</span>
